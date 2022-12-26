@@ -1,0 +1,62 @@
+name: Build and Deploy to Sandbox in Cloudhub
+
+on:
+  push:
+    branches:
+      - feature/*
+      - master
+  pull_request:
+    branches:
+      - master
+      - main
+    types:
+      - closed
+      
+  workflow_dispatch:
+    
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - uses: actions/cache@v3.2.1
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+    
+    - name: Set up Java JDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'zulu'
+        java-version: 17
+        
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:    
+    
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - uses: actions/cache@v3.2.1
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+    
+    - name: Deploy to Sandbox
+      env:
+        USERNAME: ${{ secrets.ANYPOINT_USERNAME }}
+        PASSWORD: ${{ secrets.ANYPOINT_PASSWORD }}
+      run: |
+        mvn deploy -DmuleDeploy -Danypoint.username=${{ secrets.ANYPOINT_USERNAME }} -Danypoint.password=${{ secrets.ANYPOINT_PASSWORD }} -DskipTests -Dmule.version=4.4.0 -Denv=Sandbox -Dappname=mule-learning-amit-new-test -Dbusiness=PantherSchools -DvCore= 1 -Dworkers= MICRO
