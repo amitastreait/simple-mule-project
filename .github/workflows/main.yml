@@ -18,6 +18,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
+    env:
+      NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+      PLATFORM_USERNAME: ${{ secrets.PLATFORM_USERNAME }}
+      PLATFORM_PASSWORD: ${{ secrets.PLATFORM_PASSWORD }}
+      #SANDBOX_CLIENT_ID: ${{ secrets.SANDBOX_CLIENT_ID }}
+      #SANDBOX_CLIENT_SECRET: ${{ secrets.SANDBOX_CLIENT_SECRET }} 
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    
     steps:
     
     - uses: actions/checkout@v3
@@ -35,11 +44,37 @@ jobs:
       uses: actions/setup-java@v3
       with:
         distribution: 'zulu'
-        java-version: 17
-        
+        java-version: 11
+    
+    - name: Build with Maven
+          run: mvn clean -B package -s .maven/settings.xml
+          
+    - name: Stamp artifact file name with commit hash
+      run: |
+        artifactName1=$(ls target/*.jar | head -1)
+        commitHash=$(git rev-parse --short "$GITHUB_SHA")
+        artifactName2=$(ls target/*.jar | head -1 | sed "s/.jar/-$commitHash.jar/g")
+        mv $artifactName1 $artifactName2
+    
+    - name: Upload artifact 
+      uses: actions/upload-artifact@master
+      with:
+          name: artifacts
+          path: target/*.jar
+          
   deploy:
+  
     needs: build
     runs-on: ubuntu-latest
+    
+    env:
+      NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+      PLATFORM_USERNAME: ${{ secrets.PLATFORM_USERNAME }}
+      PLATFORM_PASSWORD: ${{ secrets.PLATFORM_PASSWORD }}
+      #SANDBOX_CLIENT_ID: ${{ secrets.SANDBOX_CLIENT_ID }}
+      #SANDBOX_CLIENT_SECRET: ${{ secrets.SANDBOX_CLIENT_SECRET }} 
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
     steps:    
     
@@ -59,4 +94,4 @@ jobs:
         USERNAME: ${{ secrets.ANYPOINT_USERNAME }}
         PASSWORD: ${{ secrets.ANYPOINT_PASSWORD }}
       run: |
-        mvn deploy -DmuleDeploy -Danypoint.username=${{ secrets.ANYPOINT_USERNAME }} -Danypoint.password=${{ secrets.ANYPOINT_PASSWORD }} -DskipTests -Dmule.version=4.4.0 -Denv=Sandbox -Dappname=mule-learning-amit-new-test -Dbusiness=PantherSchools -DvCore= 1 -Dworkers= MICRO
+        mvn deploy -DmuleDeploy -Dmule.artifact=$artifactName -s .maven/settings.xml -Danypoint.username=${{ secrets.ANYPOINT_USERNAME }} -Danypoint.password=${{ secrets.ANYPOINT_PASSWORD }} -DskipTests -Dmule.version=4.4.0 -Denv=Sandbox -Dappname=mule-learning-amit-new-test -Dbusiness=PantherSchools -DvCore= 1 -Dworkers= MICRO
